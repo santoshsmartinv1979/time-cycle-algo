@@ -168,7 +168,7 @@ if st.sidebar.button("Fetch Data & Run Backtest"):
     with st.spinner("NSE (Yahoo Finance) कडून १-मिनिटांचा लाईव्ह डेटा आणत आहे..."):
         end_dt = datetime.now()
         start_dt = end_dt - timedelta(days=days_to_test)
-        df_data = yf.download(ticker, start=start_dt, end=end_dt, interval="1m")
+        df_data = yf.download(ticker, start=start_dt, end=end_dt, interval="5m")
         
     if not df_data.empty:
         with st.spinner("अल्गोचे नियम लागू करत आहे..."):
