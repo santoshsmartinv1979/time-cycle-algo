@@ -6,7 +6,7 @@ import yfinance as yf
 from datetime import datetime, timedelta
 
 # ------------------------------------------------------------------
-# १. DIGIT SUM FUNCTION
+# १. DIGIT SUM FUNCTION (ओपन प्राईसच्या अंकांची बेरीज)
 # ------------------------------------------------------------------
 def get_digit_sum(price):
     int_price = math.floor(abs(price))
@@ -20,7 +20,7 @@ def get_digit_sum(price):
     return 15 if sum_digits == 0 else sum_digits
 
 # ------------------------------------------------------------------
-# २. ATM STRIKE SELECTION
+# २. ATM STRIKE SELECTION FUNCTION (५० च्या पटीत जवळची स्ट्राईक)
 # ------------------------------------------------------------------
 def get_atm_strike(price):
     return round(price / 50) * 50
@@ -42,9 +42,11 @@ def run_backtest(df_1min):
         if len(group) == 0:
             continue
             
+        # ९:१५ ची ओपनिंग प्राईस
         open_915 = group.iloc['Open']
         digit_sum = get_digit_sum(open_915)
         
+        # Time Cycle Candle index शोधणे
         time_cycle_idx = digit_sum
         if time_cycle_idx >= len(group):
             continue
@@ -63,6 +65,7 @@ def run_backtest(df_1min):
             row = group.iloc[i]
             current_time = row['time']
             
+            # नियम ५: सकाळी १०:१६ ला ऑटो स्क्वेअर-ऑफ
             if current_time >= cutoff_time:
                 if active_trade:
                     exit_price = row['Close']
@@ -78,6 +81,7 @@ def run_backtest(df_1min):
             if is_profit_day:
                 break
                 
+            # Active Trade Management
             if active_trade:
                 if active_trade['type'] == 'CE':
                     if row['High'] >= active_trade['entry_price'] * 1.05 and not active_trade['is_trailed']:
@@ -155,14 +159,13 @@ st.set_page_config(page_title="Time Cycle Auto Tester", layout="wide")
 st.title("📊 Time Cycle Customizable V27 - Live Free Data Tester")
 
 st.sidebar.header("⚙️ Controls")
-ticker = "NIFTY_50.NS"
- 
+ticker = "NIFTY_50.NS" 
 
-days_to_test = st.sidebar.slider("मागील किती दिवसांचा डेटा तपासायचा आहे? (Days)", min_value=5, max_value=30, value=15)
-lot_size = 25
+days_to_test = st.sidebar.slider("मागील किती दिवसांचा डेटा तपासायचा आहे? (Days)", min_value=1, max_value=7, value=3)
+lot_size = 25  # नवीन नियमानुसार २५ ची लॉट साईझ
 
 if st.sidebar.button("Fetch Data & Run Backtest"):
-    with st.spinner("NSE कडून १-मिनिटांचा लाईव्ह डेटा आणत आहे..."):
+    with st.spinner("NSE (Yahoo Finance) कडून १-मिनिटांचा लाईव्ह डेटा आणत आहे..."):
         end_dt = datetime.now()
         start_dt = end_dt - timedelta(days=days_to_test)
         df_data = yf.download(ticker, start=start_dt, end=end_dt, interval="1m")
@@ -194,4 +197,4 @@ if st.sidebar.button("Fetch Data & Run Backtest"):
     else:
         st.error("डेटा गोळा करता आला नाही. कृपया काही वेळाने प्रयत्न करा.")
 else:
-    st.info("👋 डाव्या बाजूला दिवस निवडून 'Fetch Data & Run Backtest' वर क्लिक करा.")
+    st.info("👋 डाव्या बाजूला दिवस निवडून 'Fetch Data & Run Backtest' वर क्लिक करा. सॉफ्टवेअर स्वतः डेटा गोळा करून रिझल्ट दाखवेल!")
