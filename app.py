@@ -155,10 +155,11 @@ st.set_page_config(page_title="Time Cycle Auto Tester", layout="wide")
 st.title("📊 Time Cycle Customizable V27 - Live Free Data Tester")
 
 st.sidebar.header("⚙️ Controls")
-ticker = "^NSEI" 
+ticker = "NIFTY_50.NS"
+ 
 
 days_to_test = st.sidebar.slider("मागील किती दिवसांचा डेटा तपासायचा आहे? (Days)", min_value=5, max_value=30, value=15)
-lot_size = 65
+lot_size = 25
 
 if st.sidebar.button("Fetch Data & Run Backtest"):
     with st.spinner("NSE कडून १-मिनिटांचा लाईव्ह डेटा आणत आहे..."):
