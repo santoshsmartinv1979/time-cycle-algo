@@ -28,25 +28,25 @@ def get_atm_strike(price):
 # ------------------------------------------------------------------
 # ३. मुख्य बॅकटेस्टिंग इंजिन (CORE ALGO ENGINE)
 # ------------------------------------------------------------------
-def run_backtest(df_1min):
-    df_1min = df_1min.reset_index()
-    df_1min['datetime'] = pd.to_datetime(df_1min['Datetime'])
-    df_1min['date'] = df_1min['datetime'].dt.date
-    df_1min['time'] = df_1min['datetime'].dt.time
+def run_backtest(df_5min):
+    df_5min = df_5min.reset_index()
+    df_5min['datetime'] = pd.to_datetime(df_5min['Datetime'])
+    df_5min['date'] = df_5min['datetime'].dt.date
+    df_5min['time'] = df_5min['datetime'].dt.time
     
     trade_logs = []
-    daily_groups = df_1min.groupby('date')
+    daily_groups = df_5min.groupby('date')
     
     for date, group in daily_groups:
         group = group.sort_values('datetime').reset_index(drop=True)
         if len(group) == 0:
             continue
             
-        # ९:१५ ची ओपनिंग प्राईस
-        open_915 = group.iloc['Open']
+        # ९:१५ ची पहिली ५-मिनिटांची ओपन प्राईस
+        open_915 = group.iloc[0]['Open']
         digit_sum = get_digit_sum(open_915)
         
-        # Time Cycle Candle index शोधणे
+        # ५-मिनिटांच्या कॅन्डलनुसार सायकल ठरवणे (Digit sum चा बार)
         time_cycle_idx = digit_sum
         if time_cycle_idx >= len(group):
             continue
@@ -155,19 +155,20 @@ def run_backtest(df_1min):
 # ------------------------------------------------------------------
 # ४. STREAMLIT USER INTERFACE
 # ------------------------------------------------------------------
-st.set_page_config(page_title="Time Cycle Auto Tester", layout="wide")
-st.title("📊 Time Cycle Customizable V27 - Live Free Data Tester")
+st.set_page_config(page_title="Time Cycle Auto Pro", layout="wide")
+st.title("📊 Time Cycle Customizable V27 - Live 5m Data Tester")
 
 st.sidebar.header("⚙️ Controls")
 ticker = "NIFTY_50.NS" 
 
-days_to_test = st.sidebar.slider("मागील किती दिवसांचा डेटा तपासायचा आहे? (Days)", min_value=1, max_value=7, value=3)
-lot_size = 25  # नवीन नियमानुसार २५ ची लॉट साईझ
+days_to_test = st.sidebar.slider("मागील किती दिवसांचा डेटा तपासायचा आहे? (Days)", min_value=5, max_value=59, value=30)
+lot_size = 25  # २५ ची नवीन लॉट साईझ
 
 if st.sidebar.button("Fetch Data & Run Backtest"):
-    with st.spinner("NSE (Yahoo Finance) कडून १-मिनिटांचा लाईव्ह डेटा आणत आहे..."):
+    with st.spinner("NSE कडून ५-मिनिटांचा डेटा सुरक्षितपणे आणत आहे..."):
         end_dt = datetime.now()
         start_dt = end_dt - timedelta(days=days_to_test)
+        # ५-मिनिटांचा डेटा २४ तास मोफत आणि वेगाने मिळतो
         df_data = yf.download(ticker, start=start_dt, end=end_dt, interval="5m")
         
     if not df_data.empty:
@@ -191,10 +192,10 @@ if st.sidebar.button("Fetch Data & Run Backtest"):
             st.dataframe(results_df, use_container_width=True)
             
             csv_data = results_df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Excel CSV डाउनलोड करा", csv_data, "Time_Cycle_Auto_Report.csv", "text/csv")
+            st.download_button("📥 Excel CSV डाउनलोड करा", csv_data, "Time_Cycle_5m_Report.csv", "text/csv")
         else:
-            st.warning("या कालावधीत एकही ट्रेड ट्रिगर झाला नाही.")
+            st.warning("या कालावधीत सिस्टीमच्या नियमांनुसार एकही ट्रेड ट्रिगर झाला नाही.")
     else:
         st.error("डेटा गोळा करता आला नाही. कृपया काही वेळाने प्रयत्न करा.")
 else:
-    st.info("👋 डाव्या बाजूला दिवस निवडून 'Fetch Data & Run Backtest' वर क्लिक करा. सॉफ्टवेअर स्वतः डेटा गोळा करून रिझल्ट दाखवेल!")
+    st.info("👋 डाव्या बाजूला दिवस निवडून 'Fetch Data & Run Backtest' वर क्लिक करा. ५-मिनिटांचा डेटा २४ तास उपलब्ध असतो!")
