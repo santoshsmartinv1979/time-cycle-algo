@@ -36,8 +36,8 @@ def run_backtest(df_data):
         if len(group) == 0:
             continue
             
-        # ९:१५ ची ओपन प्राईस
-        open_915 = group.iloc['open']
+        # फिक्स: iloc मध्ये 'open' ऐवजी योग्य पद्धत वापरली आहे
+        open_915 = group.loc[0, 'open']
         digit_sum = get_digit_sum(open_915)
         
         # सायकल ठरवणे
@@ -158,30 +158,26 @@ lot_size = 25  # २५ ची नवीन लॉट साईझ
 if st.sidebar.button("Fetch Data & Run Backtest"):
     with st.spinner("सुरक्षित सर्व्हरवरून डेटा गोळा करत आहे..."):
         try:
-            # बॅकअपसाठी थेट मोफत आणि स्थिर ५-मिनिटांचा सॅम्पल डेटा इंजिन
             base_time = datetime.now() - timedelta(days=5)
             dates = [base_time + timedelta(days=x) for x in range(5) if (base_time + timedelta(days=x)).weekday() < 5]
             
             all_data = []
             for d in dates:
                 start_dt = datetime(d.year, d.month, d.day, 9, 15)
-                # ९:१५ ते १०:१६ पर्यंतच्या ५-मिनिटांच्या कॅन्डल्स जनरेट करणे
                 for minutes in range(0, 65, 5):
                     current_candle_time = start_dt + timedelta(minutes=minutes)
-                    # निफ्टी २५३०० चा सॅम्पल बेस डेटा
                     base_price = 25300.0 + np.random.normal(0, 15)
                     all_data.append({
-                        'Datetime': current_candle_time,
-                        'Open': base_price,
-                        'High': base_price + 10,
-                        'Low': base_price - 10,
-                        'Close': base_price + 2
+                        'datetime': current_candle_time,
+                        'open': base_price,
+                        'high': base_price + 10,
+                        'low': base_price - 10,
+                        'close': base_price + 2,
+                        'date': current_candle_time.date(),
+                        'time': current_candle_time.time()
                     })
             
             df_data = pd.DataFrame(all_data)
-            df_data['datetime'] = pd.to_datetime(df_data['Datetime'])
-            df_data['date'] = df_data['datetime'].dt.date
-            df_data['time'] = df_data['datetime'].dt.time
             
         except Exception as e:
             df_data = pd.DataFrame()
@@ -203,3 +199,7 @@ if st.sidebar.button("Fetch Data & Run Backtest"):
             col3.metric("💰 एकूण निव्वळ नफा/तोटा", f"₹ {total_pnl:,.2f}")
             
             st.markdown("---")
+            st.subheader("📜 सविस्तर ट्रेड रिपोर्ट डायरी")
+            st.dataframe(results_df, use_container_width=True)
+            
+            csv_data = results_df.to_csv(index=False).encode('utf-8')
