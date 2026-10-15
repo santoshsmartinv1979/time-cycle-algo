@@ -35,6 +35,8 @@ def run_backtest(df_data):
         df_data['datetime'] = pd.to_datetime(df_data['Datetime'])
     elif 'Date' in df_data.columns:
         df_data['datetime'] = pd.to_datetime(df_data['Date'])
+    else:
+        df_data['datetime'] = pd.to_datetime(df_data.iloc[:, 0])
         
     df_data['date'] = df_data['datetime'].dt.date
     df_data['time'] = df_data['datetime'].dt.time
@@ -47,17 +49,22 @@ def run_backtest(df_data):
         if len(group) == 0:
             continue
             
-        # ९:१५ ची ओपन प्राईस
-        open_915 = group.loc[0, 'Open']
+        # ९:१५ ची ओपन प्राईस (Open किंवा open कॉलम चेक करणे)
+        open_col = 'Open' if 'Open' in group.columns else 'open'
+        high_col = 'High' if 'High' in group.columns else 'high'
+        low_col = 'Low' if 'Low' in group.columns else 'low'
+        close_col = 'Close' if 'Close' in group.columns else 'close'
+        
+        open_915 = group.loc[0, open_col]
         digit_sum = get_digit_sum(open_915)
         
         # ५-मिनिटांच्या कॅन्डलनुसार सायकल बारindex शोधणे
         time_cycle_idx = min(digit_sum, len(group) - 1)
         
         time_candle = group.iloc[time_cycle_idx]
-        tc_high = time_candle['High']
-        tc_low = time_candle['Low']
-        atm_strike = get_atm_strike(time_candle['Close'])
+        tc_high = time_candle[high_col]
+        tc_low = time_candle[low_col]
+        atm_strike = get_atm_strike(time_candle[close_col])
         
         trades_count = 0
         is_profit_day = False
@@ -70,7 +77,7 @@ def run_backtest(df_data):
             
             if current_time >= cutoff_time:
                 if active_trade:
-                    exit_price = row['Close']
+                    exit_price = row[close_col]
                     pnl = (exit_price - active_trade['entry_price']) if active_trade['type'] == 'CE' else (active_trade['entry_price'] - exit_price)
                     trade_logs.append({
                         'Date': date, 'Type': active_trade['type'], 'Strike': atm_strike,
@@ -85,10 +92,10 @@ def run_backtest(df_data):
                 
             if active_trade:
                 if active_trade['type'] == 'CE':
-                    if row['High'] >= active_trade['entry_price'] * 1.05 and not active_trade['is_trailed']:
+                    if row[high_col] >= active_trade['entry_price'] * 1.05 and not active_trade['is_trailed']:
                         active_trade['is_trailed'] = True
                         
-                    if row['High'] >= active_trade['target_price']:
+                    if row[high_col] >= active_trade['target_price']:
                         pnl = active_trade['target_price'] - active_trade['entry_price']
                         trade_logs.append({
                             'Date': date, 'Type': 'CE', 'Strike': atm_strike, 'Entry Time': active_trade['entry_time'],
@@ -100,8 +107,8 @@ def run_backtest(df_data):
                         trades_count += 1
                         continue
                         
-                    elif row['Close'] < tc_low:
-                        sl_exit_price = active_trade['entry_price'] if active_trade['is_trailed'] else row['Close']
+                    elif row[close_col] < tc_low:
+                        sl_exit_price = active_trade['entry_price'] if active_trade['is_trailed'] else row[close_col]
                         pnl = sl_exit_price - active_trade['entry_price']
                         trade_logs.append({
                             'Date': date, 'Type': 'CE', 'Strike': atm_strike, 'Entry Time': active_trade['entry_time'],
@@ -112,10 +119,10 @@ def run_backtest(df_data):
                         trades_count += 1
                         
                 elif active_trade['type'] == 'PE':
-                    if row['Low'] <= active_trade['entry_price'] * 0.95 and not active_trade['is_trailed']:
+                    if row[low_col] <= active_trade['entry_price'] * 0.95 and not active_trade['is_trailed']:
                         active_trade['is_trailed'] = True
                         
-                    if row['Low'] <= active_trade['target_price']:
+                    if row[low_col] <= active_trade['target_price']:
                         pnl = active_trade['entry_price'] - active_trade['target_price']
                         trade_logs.append({
                             'Date': date, 'Type': 'PE', 'Strike': atm_strike, 'Entry Time': active_trade['entry_time'],
@@ -127,8 +134,8 @@ def run_backtest(df_data):
                         trades_count += 1
                         continue
                         
-                    elif row['Close'] > tc_high:
-                        sl_exit_price = active_trade['entry_price'] if active_trade['is_trailed'] else row['close'] if 'close' in row else row['Close']
+                    elif row[close_col] > tc_high:
+                        sl_exit_price = active_trade['entry_price'] if active_trade['is_trailed'] else row[close_col]
                         pnl = active_trade['entry_price'] - sl_exit_price
                         trade_logs.append({
                             'Date': date, 'Type': 'PE', 'Strike': atm_strike, 'Entry Time': active_trade['entry_time'],
@@ -140,12 +147,12 @@ def run_backtest(df_data):
 
             else:
                 if trades_count < 2:
-                    if row['High'] > tc_high:
+                    if row[high_col] > tc_high:
                         active_trade = {
                             'type': 'CE', 'entry_time': current_time, 'entry_price': tc_high,
                             'target_price': tc_high * 1.10, 'is_trailed': False
                         }
-                    elif row['Low'] < tc_low:
+                    elif row[low_col] < tc_low:
                         active_trade = {
                             'type': 'PE', 'entry_time': current_time, 'entry_price': tc_low,
                             'target_price': tc_low * 0.90, 'is_trailed': False
@@ -162,21 +169,19 @@ st.title("📊 Time Cycle Customizable V27 - 1-Year Pro Backtester")
 st.sidebar.header("⚙️ Controls")
 ticker = "NIFTY_50.NS" 
 
-# स्लायडर थेट ६० दिवसांपर्यंत (मोफत इंट्राडे डेटा मर्यादा) किंवा महिन्यांचे पर्याय
-months_to_test = st.sidebar.slider("मागील किती महिन्यांचा डेटा तपासायचा आहे? (Months)", min_value=1, max_value=12, value=1)
+# स्लायडर थेट ६० दिवसांपर्यंत (२ महिने) मोफत इंट्राडे डेटा मर्यादा
+days_to_test = st.sidebar.slider("मागील किती दिवसांचा डेटा तपासायचा आहे? (Days)", min_value=5, max_value=59, value=30)
 lot_size = 25  
 
 if st.sidebar.button("Fetch NSE Data & Run Backtest"):
     with st.spinner("NSE कडून अधिकृत ऐतिहासिक डेटा सुरक्षितपणे आणत आहे..."):
         end_dt = datetime.now()
-        start_dt = end_dt - timedelta(days=months_to_test * 30)
-        
-        # जर युझरने १ महिन्यापेक्षा जास्त निवडले, तर याहू नियम पाळण्यासाठी ५ मिनिट किंवा डेली डेटा मॅनेज करणे
-        interval_choice = "5m" if months_to_test <= 2 else "1d"
-        df_data = yf.download(ticker, start=start_dt, end=end_dt, interval=interval_choice)
+        start_dt = end_dt - timedelta(days=days_to_test)
+        # ५-मिनिटांचा डेटा २४ तास उपलब्ध असतो
+        df_data = yf.download(ticker, start=start_dt, end=end_dt, interval="5m")
         
     if not df_data.empty:
-        with st.spinner("१ वर्षाचे नियम लागू करत आहे..."):
+        with st.spinner("नियम लागू करत आहे..."):
             results_df = run_backtest(df_data)
             
         if not results_df.empty:
@@ -192,9 +197,7 @@ if st.sidebar.button("Fetch NSE Data & Run Backtest"):
             col3.metric("💰 एकूण निव्वळ नफा/तोटा", f"₹ {total_pnl:,.2f}")
             
             st.markdown("---")
-            st.subheader("📜 मागील १ वर्षाची सविस्तर ट्रेड रिपोर्ट डायरी")
+            st.subheader("📜 सविस्तर ट्रेड रिपोर्ट डायरी")
             st.dataframe(results_df, use_container_width=True)
             
             csv_data = results_df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 संपूर्ण १ वर्षाचा रिपोर्ट Excel मध्ये डाऊनलोड करा", csv_data, "Time_Cycle_1Year_Report.csv", "text/csv")
-        else:
