@@ -30,7 +30,6 @@ def get_atm_strike(price):
 # ------------------------------------------------------------------
 def run_backtest(df_data):
     df_data = df_data.reset_index()
-    # कॉलम नावे योग्य फॉरमॅट करणे
     if 'Datetime' in df_data.columns:
         df_data['datetime'] = pd.to_datetime(df_data['Datetime'])
     elif 'Date' in df_data.columns:
@@ -49,7 +48,6 @@ def run_backtest(df_data):
         if len(group) == 0:
             continue
             
-        # ९:१५ ची ओपन प्राईस (Open किंवा open कॉलम चेक करणे)
         open_col = 'Open' if 'Open' in group.columns else 'open'
         high_col = 'High' if 'High' in group.columns else 'high'
         low_col = 'Low' if 'Low' in group.columns else 'low'
@@ -58,7 +56,6 @@ def run_backtest(df_data):
         open_915 = group.loc[0, open_col]
         digit_sum = get_digit_sum(open_915)
         
-        # ५-मिनिटांच्या कॅन्डलनुसार सायकल बारindex शोधणे
         time_cycle_idx = min(digit_sum, len(group) - 1)
         
         time_candle = group.iloc[time_cycle_idx]
@@ -161,29 +158,25 @@ def run_backtest(df_data):
     return pd.DataFrame(trade_logs)
 
 # ------------------------------------------------------------------
-# ४. STREAMLIT USER INTERFACE
+# ४. STREAMLIT USER INTERFACE (AUTO LOAD MODE)
 # ------------------------------------------------------------------
-st.set_page_config(page_title="Time Cycle 1-Year Tester", layout="wide")
-st.title("📊 Time Cycle Customizable V27 - 1-Year Pro Backtester")
+st.set_page_config(page_title="Time Cycle Auto Pro", layout="wide")
+st.title("📊 Time Cycle Customizable V27 - 30-Days Auto Backtester")
 
-st.sidebar.header("⚙️ Controls")
 ticker = "NIFTY_50.NS" 
-
-# स्लायडर थेट ६० दिवसांपर्यंत (२ महिने) मोफत इंट्राडे डेटा मर्यादा
-days_to_test = st.sidebar.slider("मागील किती दिवसांचा डेटा तपासायचा आहे? (Days)", min_value=5, max_value=59, value=30)
 lot_size = 25  
 
-if st.sidebar.button("Fetch NSE Data & Run Backtest"):
-    with st.spinner("NSE कडून अधिकृत ऐतिहासिक डेटा सुरक्षितपणे आणत आहे..."):
-        end_dt = datetime.now()
-        start_dt = end_dt - timedelta(days=days_to_test)
-        # ५-मिनिटांचा डेटा २४ तास उपलब्ध असतो
-        df_data = yf.download(ticker, start=start_dt, end=end_dt, interval="5m")
-        
+st.info("🔄 सिस्टीम मागील ३० दिवसांचा निफ्टी डेटा इंटरनेटवरून थेट लोड करत आहे, कृपया ५ सेकंद थांबा...")
+
+# कोणत्याही बटणाशिवाय थेट डेटा लोड करणे (No Button Required)
+try:
+    end_dt = datetime.now()
+    start_dt = end_dt - timedelta(days=30)
+    df_data = yf.download(ticker, start=start_dt, end=end_dt, interval="5m")
+    
     if not df_data.empty:
-        with st.spinner("नियम लागू करत आहे..."):
-            results_df = run_backtest(df_data)
-            
+        results_df = run_backtest(df_data)
+        
         if not results_df.empty:
             results_df['Net_Profit_Rs'] = results_df['PnL_Points'] * lot_size
             total_trades = len(results_df)
@@ -191,13 +184,21 @@ if st.sidebar.button("Fetch NSE Data & Run Backtest"):
             win_rate = (win_trades / total_trades) * 100 if total_trades > 0 else 0
             total_pnl = results_df['Net_Profit_Rs'].sum()
             
+            # रिझल्ट डिस्प्ले
             col1, col2, col3 = st.columns(3)
             col1.metric("📊 एकूण ट्रेड्स", f"{total_trades}")
             col2.metric("🎯 विन रेट (Win Rate)", f"{win_rate:.2f}%")
             col3.metric("💰 एकूण निव्वळ नफा/तोटा", f"₹ {total_pnl:,.2f}")
             
             st.markdown("---")
-            st.subheader("📜 सविस्तर ट्रेड रिपोर्ट डायरी")
+            st.subheader("📜 मागील ३० दिवसांची सविस्तर ट्रेड रिपोर्ट डायरी")
             st.dataframe(results_df, use_container_width=True)
             
             csv_data = results_df.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 संपूर्ण रिपोर्ट Excel मध्ये डाऊनलोड करा", csv_data, "Time_Cycle_30Days_Report.csv", "text/csv")
+        else:
+            st.warning("या कालावधीत सिस्टीमच्या नियमांनुसार एकही ट्रेड ट्रिगर झाला नाही.")
+    else:
+        st.error("❌ मार्केट सुरू झाल्यामुळे NSE सर्व्हर बिझी आहे, कृपया १ मिनिटाने पेज रिफ्रेश करा.")
+except Exception as e:
+    st.error(f"डेटा लोड करताना चूक झाली: {e}")
